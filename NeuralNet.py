@@ -91,12 +91,17 @@ if __name__=="__main__":
 
     loss = []
     for i in range(100):
+        idx = np.random.permutation(X.shape[1])
+        X, y = X[idx], y[idx]
         network.forward(X)
         loss.append(network.loss(y))
         network.update_weights(X, y)
     loss = np.array(loss).ravel()
     x = np.arange(len(loss))
     plt.plot(x, loss)
+    plt.ylabel("loss(y_h)")
+    plt.xlabel("epoch")
+    plt.title("MLP using logistic function")
     plt.show()
 
     y_h = np.around(network.forward(X))

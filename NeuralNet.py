@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
+import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import expit
-from sklearn.datasets import fetch_openml
 from sklearn.metrics import accuracy_score
 
 def sigmoid(x):
@@ -80,22 +80,40 @@ class NeuralNet:
         self.backward(X, y)
         self.gradient_descent(X)
 
+
+def init_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-e", "--epoch", type=int, default=1000, help="number of epochs")
+    parser.add_argument("-r", "--rate", type=float, default=0.01, help="learning rate")
+    parser.add_argument("-l", "--layers", type=int, default=2, help="number of layers")
+    parser.add_argument("-b", "--batch", type=int, default=None, help="set batch size")
+    parser.add_argument("infile")
+    return parser
+
 if __name__=="__main__":
-    df = pd.read_csv("data.csv", header=None, index_col=0)
+    parser = init_parser()
+    args = parser.parse_args()
+
+    #parse and preprocess the data
+    df = pd.read_csv(args.infile, header=None, index_col=0)
     labels = df.pop(1).eq('M').mul(1)
     data = (df - df.mean()) / df.std()
     X, y = data.values.astype(float), labels.values.astype(int)
     y = y.reshape(-1, 1)
 
-    network = NeuralNet(2, X.shape[1], 1, learning_rate=0.1)
+    #initialize the network
+    network = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate)
 
+    #train
     loss = []
-    for i in range(100):
+    for i in range(args.epoch):
         idx = np.random.permutation(X.shape[1])
         X, y = X[idx], y[idx]
         network.forward(X)
         loss.append(network.loss(y))
         network.update_weights(X, y)
+
+    #plot the loss
     loss = np.array(loss).ravel()
     x = np.arange(len(loss))
     plt.plot(x, loss)
@@ -104,5 +122,6 @@ if __name__=="__main__":
     plt.title("MLP using logistic function")
     plt.show()
 
+    #calc accuracy
     y_h = np.around(network.forward(X))
     print("Accuracy on training:", accuracy_score(y, y_h))

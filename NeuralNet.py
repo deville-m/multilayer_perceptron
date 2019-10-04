@@ -17,6 +17,7 @@ class NNLayer:
         self.s_in = s_in
         self.s_out = s_out
         self.isout = isout
+        self.learning_rate = learning_rate
         self.W = np.random.randn(s_in, s_out)
         self.b = np.zeros(s_out)
 
@@ -32,6 +33,12 @@ class NNLayer:
             return self.delta, self.W
         self.delta = e.dot(W.T) * self.deriv
         return self.delta, self.W
+
+    def update_weights(self, prev):
+        m = self.delta.shape[0]
+        self.W -= self.learning_rate * (np.sum(prev.T.dot(self.delta), axis=0) / m)
+        self.b -= self.learning_rate * (np.sum(self.delta, axis=0) / m)
+
 
 class NeuralNet:
     def __init__(self, depth, s_in, s_out, learning_rate=0.01):
@@ -67,18 +74,23 @@ class NeuralNet:
         for i in range(1, self.depth):
             prev = self.layers[i - 1]
             layer = self.layers[i]
-            m = layer.delta.shape[0]
-            layer.W -= self.learning_rate * (np.sum(prev.output.T.dot(layer.delta), axis=0) / m)
-            layer.b -= self.learning_rate * (np.sum(layer.delta, axis=0) / m)
-
+            layer.update_weights(prev.output)
         # Update the 1st layer with X
-        m = self.layers[0].delta.shape[0]
-        self.layers[0].W -= self.learning_rate * (np.sum(X.T.dot(layer.delta), axis=0) / m)
-        self.layers[0].b -= self.learning_rate * (np.sum(layer.delta, axis=0) / m)
+        self.layers[0].update_weights(X)
 
     def update_weights(self, X, y):
         self.backward(X, y)
         self.gradient_descent(X)
+
+    def train(self, X, y, epoch):
+        loss = []
+        for i in range(epoch):
+            idx = np.random.permutation(X.shape[0])
+            X, y = X[idx], y[idx]
+            self.forward(X)
+            loss.append(self.loss(y))
+            self.update_weights(X, y)
+        return np.array(loss).ravel()
 
 
 def init_parser():
@@ -102,19 +114,11 @@ if __name__=="__main__":
     y = y.reshape(-1, 1)
 
     #initialize the network
-    network = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate)
+    NN = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate)
 
-    #train
-    loss = []
-    for i in range(args.epoch):
-        idx = np.random.permutation(X.shape[1])
-        X, y = X[idx], y[idx]
-        network.forward(X)
-        loss.append(network.loss(y))
-        network.update_weights(X, y)
+    loss = NN.train(X, y, args.epoch)
 
     #plot the loss
-    loss = np.array(loss).ravel()
     x = np.arange(len(loss))
     plt.plot(x, loss)
     plt.ylabel("loss(y_h)")
@@ -123,5 +127,5 @@ if __name__=="__main__":
     plt.show()
 
     #calc accuracy
-    y_h = np.around(network.forward(X))
+    y_h = np.around(NN.forward(X))
     print("Accuracy on training:", accuracy_score(y, y_h))

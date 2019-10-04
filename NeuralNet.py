@@ -3,6 +3,7 @@ import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 from scipy.special import expit
 from sklearn.metrics import accuracy_score
 
@@ -41,7 +42,7 @@ class NNLayer:
 
 
 class NeuralNet:
-    def __init__(self, depth, s_in, s_out, learning_rate=0.01):
+    def __init__(self, depth, s_in, s_out, learning_rate=0.01, load=None):
         self.layers = []
         self.depth = depth
         self.learning_rate = learning_rate
@@ -52,8 +53,11 @@ class NeuralNet:
             s_in, out = out, s_in - decr
         self.layers.append(NNLayer(s_in, s_out, isout=True, learning_rate=learning_rate))
 
-    def loss(self, y):
-        h = self.layers[-1].output
+        if load:
+            self.load(load)
+
+    def loss(self, X, y):
+        h = self.forward(X)
         m = y.shape[0]
         return (- y.T.dot(np.log(h)) - (1 - y).T.dot(np.log(1 - h))) / m
 
@@ -92,10 +96,27 @@ class NeuralNet:
             ds, lab = ds[idx], lab[idx]
             for X, y in zip(np.array_split(ds, batch), np.array_split(lab, batch)):
                 self.forward(X)
-                loss.append(self.loss(y))
                 self.update_weights(X, y)
+            loss.append(self.loss(ds, lab))
             print("Epoch:", i, "/", epoch, "-- learning_rate:", self.learning_rate, "-- loss:", loss[-1])
         return np.array(loss).ravel()
+
+    def save(self, fname):
+        np.save(fname, [(layer.W, layer.b) for layer in self.layers])
+
+    def load(self, fname):
+        if len(fname) >= 4  and fname[-4: -1] != ".npy":
+            fname += ".npy"
+        try:
+            data = np.load(fname, allow_pickle=True)
+            i = 0
+            for d in data:
+                layer = self.layers[i]
+                layer.W, layer.b = d
+                i += 1
+        except Exception as e:
+            print("Cannot load weights:", e, file=sys.stderr)
+            sys.exit(1)
 
 def preprocessing(f):
     #parse and preprocess the data
@@ -113,8 +134,10 @@ def init_parser():
     parser.add_argument("-l", "--layers", type=int, default=2, help="number of layers")
     parser.add_argument("-b", "--batch", type=int, default=None, help="set batch size")
     parser.add_argument("-g", "--graph", action="store_true", default=False, help="show learning graphs")
-    parser.add_argument("training_dataset")
+    parser.add_argument("-s", "--save", help="save the weights to a file")
+    parser.add_argument("--load", default=None, help="load weights")
     parser.add_argument("-t", "--test", default=None)
+    parser.add_argument("training_dataset")
     return parser
 
 if __name__=="__main__":
@@ -124,7 +147,7 @@ if __name__=="__main__":
     X, y = preprocessing(args.training_dataset)
 
     #initialize the network
-    NN = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate)
+    NN = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate, load=args.load)
 
     loss = NN.train(X, y, args.epoch, args.batch)
 
@@ -133,7 +156,6 @@ if __name__=="__main__":
         x = np.arange(len(loss))
         plt.plot(x, loss)
         plt.ylabel("loss(y_h)")
-        plt.xlabel("epoch")
         plt.title("MLP using logistic function")
         plt.show()
 
@@ -147,3 +169,6 @@ if __name__=="__main__":
         #pass the test
         y_h = np.around(NN.forward(X))
         print("Accuracy on test:", accuracy_score(y, y_h))
+
+    if args.save:
+        NN.save(args.save)

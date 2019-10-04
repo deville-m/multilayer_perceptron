@@ -92,6 +92,14 @@ class NeuralNet:
             self.update_weights(X, y)
         return np.array(loss).ravel()
 
+def preprocessing(f):
+    #parse and preprocess the data
+    df = pd.read_csv(f, header=None, index_col=0)
+    labels = df.pop(1).eq('M').mul(1)
+    data = (df - df.mean()) / df.std()
+    X, y = data.values.astype(float), labels.values.astype(int)
+    y = y.reshape(-1, 1)
+    return X, y
 
 def init_parser():
     parser = argparse.ArgumentParser()
@@ -100,19 +108,15 @@ def init_parser():
     parser.add_argument("-l", "--layers", type=int, default=2, help="number of layers")
     parser.add_argument("-b", "--batch", type=int, default=None, help="set batch size")
     parser.add_argument("-g", "--graph", action="store_true", default=False, help="show learning graphs")
-    parser.add_argument("infile")
+    parser.add_argument("training_dataset")
+    parser.add_argument("-t", "--test", default=None)
     return parser
 
 if __name__=="__main__":
     parser = init_parser()
     args = parser.parse_args()
 
-    #parse and preprocess the data
-    df = pd.read_csv(args.infile, header=None, index_col=0)
-    labels = df.pop(1).eq('M').mul(1)
-    data = (df - df.mean()) / df.std()
-    X, y = data.values.astype(float), labels.values.astype(int)
-    y = y.reshape(-1, 1)
+    X, y = preprocessing(args.training_dataset)
 
     #initialize the network
     NN = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate)
@@ -131,3 +135,10 @@ if __name__=="__main__":
     #calc accuracy
     y_h = np.around(NN.forward(X))
     print("Accuracy on training:", accuracy_score(y, y_h))
+
+    if args.test:
+        X, y = preprocessing(args.test)
+
+        #pass the test
+        y_h = np.around(NN.forward(X))
+        print("Accuracy on test:", accuracy_score(y, y_h))

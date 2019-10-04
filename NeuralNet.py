@@ -82,14 +82,19 @@ class NeuralNet:
         self.backward(X, y)
         self.gradient_descent(X)
 
-    def train(self, X, y, epoch):
+    def train(self, ds, lab, epoch=10000, batch=None):
+        if batch is None:
+            batch = len(ds)
+        batch = np.ceil(len(ds) / batch)
         loss = []
         for i in range(epoch):
-            idx = np.random.permutation(X.shape[0])
-            X, y = X[idx], y[idx]
-            self.forward(X)
-            loss.append(self.loss(y))
-            self.update_weights(X, y)
+            idx = np.random.permutation(ds.shape[0])
+            ds, lab = ds[idx], lab[idx]
+            for X, y in zip(np.array_split(ds, batch), np.array_split(lab, batch)):
+                self.forward(X)
+                loss.append(self.loss(y))
+                self.update_weights(X, y)
+            print("Epoch:", i, "/", epoch, "-- learning_rate:", self.learning_rate, "-- loss:", loss[-1])
         return np.array(loss).ravel()
 
 def preprocessing(f):
@@ -121,7 +126,7 @@ if __name__=="__main__":
     #initialize the network
     NN = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate)
 
-    loss = NN.train(X, y, args.epoch)
+    loss = NN.train(X, y, args.epoch, args.batch)
 
     if args.graph:
         #plot the loss

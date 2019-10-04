@@ -99,6 +99,7 @@ def init_parser():
     parser.add_argument("-r", "--rate", type=float, default=0.01, help="learning rate")
     parser.add_argument("-l", "--layers", type=int, default=2, help="number of layers")
     parser.add_argument("-b", "--batch", type=int, default=None, help="set batch size")
+    parser.add_argument("-g", "--graph", action="store_true", default=False, help="show learning graphs")
     parser.add_argument("infile")
     return parser
 
@@ -118,13 +119,14 @@ if __name__=="__main__":
 
     loss = NN.train(X, y, args.epoch)
 
-    #plot the loss
-    x = np.arange(len(loss))
-    plt.plot(x, loss)
-    plt.ylabel("loss(y_h)")
-    plt.xlabel("epoch")
-    plt.title("MLP using logistic function")
-    plt.show()
+    if args.graph:
+        #plot the loss
+        x = np.arange(len(loss))
+        plt.plot(x, loss)
+        plt.ylabel("loss(y_h)")
+        plt.xlabel("epoch")
+        plt.title("MLP using logistic function")
+        plt.show()
 
     #calc accuracy
     y_h = np.around(NN.forward(X))

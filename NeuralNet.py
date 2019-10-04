@@ -23,7 +23,6 @@ class NNLayer:
         self.b = np.zeros(s_out)
 
     def forward(self, X):
-        self.input = X
         self.output = sigmoid(X.dot(self.W) + self.b)
         self.deriv = d_sigmoid(self.output)
         return self.output
@@ -59,7 +58,7 @@ class NeuralNet:
     def loss(self, X, y):
         h = self.forward(X)
         m = y.shape[0]
-        return (- y.T.dot(np.log(h)) - (1 - y).T.dot(np.log(1 - h))) / m
+        return (- y.T.dot(np.log(h)) - (1 - y).T.dot(np.log(1 - h))).diagonal().mean() / m
 
     def forward(self, X):
         a = X
@@ -86,7 +85,7 @@ class NeuralNet:
         self.backward(X, y)
         self.gradient_descent(X)
 
-    def train(self, ds, lab, epoch=10000, batch=None):
+    def train(self, ds, lab, epoch=100, batch=None, verbose=False):
         if batch is None:
             batch = len(ds)
         batch = np.ceil(len(ds) / batch)
@@ -98,7 +97,8 @@ class NeuralNet:
                 self.forward(X)
                 self.update_weights(X, y)
             loss.append(self.loss(ds, lab))
-            print("Epoch:", i, "/", epoch, "-- learning_rate:", self.learning_rate, "-- loss:", loss[-1])
+            if verbose:
+                print("Epoch:", i, "/", epoch - 1, "-- learning_rate:", self.learning_rate, "-- loss:", loss[-1])
         return np.array(loss).ravel()
 
     def save(self, fname):
@@ -133,6 +133,7 @@ def init_parser():
     parser.add_argument("-r", "--rate", type=float, default=0.01, help="learning rate")
     parser.add_argument("-l", "--layers", type=int, default=2, help="number of layers")
     parser.add_argument("-b", "--batch", type=int, default=None, help="set batch size")
+    parser.add_argument("-v", "--verbose", action="store_true", default=None, help="set batch size")
     parser.add_argument("-g", "--graph", action="store_true", default=False, help="show learning graphs")
     parser.add_argument("-s", "--save", help="save the weights to a file")
     parser.add_argument("--load", default=None, help="load weights")
@@ -149,7 +150,7 @@ if __name__=="__main__":
     #initialize the network
     NN = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate, load=args.load)
 
-    loss = NN.train(X, y, args.epoch, args.batch)
+    loss = NN.train(X, y, args.epoch, args.batch, args.verbose)
 
     if args.graph:
         #plot the loss

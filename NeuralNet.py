@@ -41,24 +41,22 @@ class NNLayer:
 
 
 class NeuralNet:
-    def __init__(self, depth, s_in, s_out, learning_rate=0.01, load=None):
+    def __init__(self, depth, width, s_in, s_out, learning_rate=0.01, load=None):
         self.layers = []
         self.depth = depth
         self.learning_rate = learning_rate
-        decr = s_in // depth
-        out = s_in
-        for i in range(depth - 1):
-            self.layers.append(NNLayer(s_in, out, learning_rate=learning_rate))
-            s_in, out = out, s_in - decr
-        self.layers.append(NNLayer(s_in, s_out, isout=True, learning_rate=learning_rate))
+        self.layers.append(NNLayer(s_in, width, learning_rate=learning_rate))
+        for i in range(1, depth - 1):
+            self.layers.append(NNLayer(width, width, learning_rate=learning_rate))
+        self.layers.append(NNLayer(width, s_out, isout=True, learning_rate=learning_rate))
 
         if load:
             self.load(load)
 
     def loss(self, X, y):
         h = self.forward(X)
-        m = y.shape[0]
-        return (- y.T.dot(np.log(h)) - (1 - y).T.dot(np.log(1 - h))).diagonal().mean() / m
+        m = h.shape[0]
+        return (- y.T.dot(np.log(h)) - (1 - y).T.dot(np.log(1 - h))).diagonal().sum() / m
 
     def forward(self, X):
         a = X
@@ -96,9 +94,10 @@ class NeuralNet:
             for X, y in zip(np.array_split(ds, batch), np.array_split(lab, batch)):
                 self.forward(X)
                 self.update_weights(X, y)
+                #print(self.loss(X, y))
             loss.append(self.loss(ds, lab))
             if verbose:
-                print("Epoch:", i, "/", epoch - 1, "-- learning_rate:", self.learning_rate, "-- loss:", loss[-1])
+                print("Epoch:", i + 1, "/", epoch, "-- learning_rate:", self.learning_rate, "-- loss:", loss[-1])
         return np.array(loss).ravel()
 
     def save(self, fname):
@@ -131,7 +130,7 @@ def init_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epoch", type=int, default=1000, help="number of epochs")
     parser.add_argument("-r", "--rate", type=float, default=0.01, help="learning rate")
-    parser.add_argument("-l", "--layers", type=int, default=2, help="number of layers")
+    parser.add_argument("-l", "--layers", type=int, default=3, help="number of layers")
     parser.add_argument("-b", "--batch", type=int, default=None, help="set batch size")
     parser.add_argument("-v", "--verbose", action="store_true", default=None, help="set batch size")
     parser.add_argument("-g", "--graph", action="store_true", default=False, help="show learning graphs")
@@ -148,7 +147,7 @@ if __name__=="__main__":
     X, y = preprocessing(args.training_dataset)
 
     #initialize the network
-    NN = NeuralNet(args.layers, X.shape[1], 1, learning_rate=args.rate, load=args.load)
+    NN = NeuralNet(args.layers, 10, X.shape[1], 1, learning_rate=args.rate, load=args.load)
 
     loss = NN.train(X, y, args.epoch, args.batch, args.verbose)
 

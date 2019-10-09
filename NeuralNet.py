@@ -18,8 +18,13 @@ def sigmoid(x, derivative=False):
     temp = expit(x)
     if not derivative:
         return temp
-    else:
-        return temp * (1 - temp)
+    return temp * (1 - temp)
+
+def softmax(x, derivative=False):
+    shiftx = x - np.max(x)
+    exps = np.exp(shiftx)
+    A = exps / np.sum(exps, axis=1, keepdims=True)
+    return A
 
 class Dense:
     def __init__(self, units, input_shape, activation=sigmoid, learning_rate=0.01):
@@ -57,15 +62,11 @@ class Dense:
             the delta (error) for this layer
             the weights of the current layer
         """
-        self.deriv = self.activation(self.Z, derivative=True)
         if self.isout:
             self.delta = self.A - E
             return self.delta, self.W
 
-        #deriv.shape  = (1, nb_classes)
-        #E.shape      = (1, nb_classes)
-        #self.W.shape = (nb_features, nb_classes)
-        #self.delta = np.empty((E.shape[0], self.s_out))
+        self.deriv = self.activation(self.Z, derivative=True)
         self.delta = (E @ W.T) * self.deriv
         return self.delta, self.W
 

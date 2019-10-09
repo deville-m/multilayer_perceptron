@@ -7,20 +7,29 @@ import sys
 from scipy.special import expit
 from sklearn.metrics import accuracy_score
 
-def sigmoid(x):
-    return expit(x)
+def relu(x, derivative=False):
+    temp = np.copy(x)
+    temp[temp < 0] = 0
+    if derivative:
+        temp[temp >= 0] = 1
+    return temp
 
-def d_sigmoid(x):
-    return sigmoid(x) * (1 - sigmoid(x))
+def sigmoid(x, derivative=False):
+    temp = expit(x)
+    if not derivative:
+        return temp
+    else:
+        return temp * (1 - temp)
 
-class NNLayer:
-    def __init__(self, s_in, s_out, isout=False, learning_rate=0.01):
-        self.s_in = s_in
-        self.s_out = s_out
-        self.isout = isout
+class Dense:
+    def __init__(self, units, input_shape, activation=sigmoid, learning_rate=0.01):
+        self.units = units
+        self.input_shape = input_shape
+        self.activation = activation
+        self.isout = False
         self.learning_rate = learning_rate
-        self.W = np.random.randn(s_in, s_out)
-        self.b = np.zeros((1, s_out))
+        self.W = np.random.randn(input_shape, units)
+        self.b = np.zeros((1, units))
 
     def forward(self, X, save_output=False):
         """Apply forward propagation for one layer
@@ -30,7 +39,7 @@ class NNLayer:
             save_output: if True save the intermidiate and final output
         """
         Z = X @ self.W + self.b
-        A = sigmoid(Z)
+        A = self.activation(Z)
         if save_output:
             self.Z = Z
             self.A = A
@@ -48,7 +57,7 @@ class NNLayer:
             the delta (error) for this layer
             the weights of the current layer
         """
-        self.deriv = d_sigmoid(self.Z)
+        self.deriv = self.activation(self.Z, derivative=True)
         if self.isout:
             self.delta = self.A - E
             return self.delta, self.W
@@ -82,24 +91,19 @@ class NNLayer:
 
 
 class NeuralNet:
-    def __init__(self, s_in, s_out, depth, hidden=None, learning_rate=0.01, load=None):
+    def __init__(self, load=None):
         self.layers = []
-        self.depth = depth
-        self.learning_rate = learning_rate
-
-        #initialize the layers
-        if depth >= 2:
-            if hidden is None:
-                hidden = (s_in + s_out) // 2
-            self.layers.append(NNLayer(s_in, hidden, learning_rate=learning_rate))
-            for i in range(1, depth - 1):
-                self.layers.append(NNLayer(hidden, hidden, learning_rate=learning_rate))
-            self.layers.append(NNLayer(hidden, s_out, isout=True, learning_rate=learning_rate))
-        else:
-            self.layers.append(NNLayer(s_in, s_out, isout=True, learning_rate=learning_rate))
+        self.depth = 0
 
         if load:
             self.load(load)
+
+    def append(self, layer):
+        if self.layers:
+            self.layers[-1].isout = False
+        layer.isout = True
+        self.layers.append(layer)
+        self.depth += 1
 
     def loss(self, X, y):
         h = self.forward(X)
@@ -137,25 +141,24 @@ class NeuralNet:
                 self.backward(X, y)
             loss.append(self.loss(ds, lab))
             if verbose:
-                print("Epoch:", i + 1, "/", epoch, "-- learning_rate:", self.learning_rate, "-- loss:", loss[-1])
+                print("Epoch:", i + 1, "/", epoch, "-- learning_rate:", self.layers[-1].learning_rate, "-- loss:", loss[-1])
         return np.array(loss).ravel()
 
     def save(self, fname):
-        np.save(fname, [(layer.W, layer.b) for layer in self.layers])
+        np.save(fname, [(layer.W, layer.b, layer.activation, layer.learning_rate) for layer in self.layers])
 
     def load(self, fname):
         if len(fname) >= 4  and fname[-4: -1] != ".npy":
             fname += ".npy"
         try:
             data = np.load(fname, allow_pickle=True)
-            i = 0
-            for d in data:
-                layer = self.layers[i]
-                layer.W, layer.b = d
-                i += 1
         except Exception as e:
             print("Cannot load weights:", e, file=sys.stderr)
             sys.exit(1)
+
+        for W, b, activation, rate in data:
+            layer = Dense(W.shape[1], W.shape[0], activation=activation, learning_rate=rate)
+            self.append(layer)
 
 
 def preprocessing(f):
@@ -171,7 +174,7 @@ def init_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--epoch", type=int, default=1000, help="number of epochs")
     parser.add_argument("-r", "--rate", type=float, default=0.01, help="learning rate")
-    parser.add_argument("-l", "--layers", type=int, default=3, help="number of layers")
+    parser.add_argument("-l", "--layers", type=int, default=2, help="number of layers")
     parser.add_argument("-b", "--batch", type=int, default=None, help="set batch size")
     parser.add_argument("-v", "--verbose", action="store_true", default=None, help="set batch size")
     parser.add_argument("-g", "--graph", action="store_true", default=False, help="show learning graphs")
@@ -188,15 +191,24 @@ if __name__=="__main__":
     X, y = preprocessing(args.training_dataset)
 
     #initialize the network
-    NN = NeuralNet(X.shape[1], 1, depth=2, learning_rate=args.rate, load=args.load)
+    NN = NeuralNet(load=args.load)
+
+    if args.load is None:
+        if args.layers >= 2:
+            NN.append(Dense(10, X.shape[1], learning_rate=args.rate))
+            for i in range(1, args.layers - 1):
+                NN.append(Dense(10, 10, learning_rate=args.rate))
+            NN.append(Dense(1, 10, learning_rate=args.rate))
+        elif args.layers == 1:
+            NN.append(Dense(1, X.shape[1], learning_rate=args.rate))
 
     loss = NN.train(X, y, args.epoch, args.batch, args.verbose)
 
     if args.graph:
         #plot the loss
-        x = np.arange(len(loss))
-        plt.plot(x, loss)
+        plt.plot(loss)
         plt.ylabel("loss(y_h)")
+        plt.xlabel("epoch")
         plt.title("MLP using logistic function")
         plt.show()
 

@@ -11,7 +11,7 @@ def sigmoid(x):
     return expit(x)
 
 def d_sigmoid(x):
-    return x * (1 - x)
+    return sigmoid(x) * (1 - sigmoid(x))
 
 class NNLayer:
     def __init__(self, s_in, s_out, isout=False, learning_rate=0.01):
@@ -20,35 +20,83 @@ class NNLayer:
         self.isout = isout
         self.learning_rate = learning_rate
         self.W = np.random.randn(s_in, s_out)
-        self.b = np.zeros(s_out)
+        self.b = np.zeros((1, s_out))
 
-    def forward(self, X):
-        self.output = sigmoid(X.dot(self.W) + self.b)
-        self.deriv = d_sigmoid(self.output)
-        return self.output
+    def forward(self, X, save_output=False):
+        """Apply forward propagation for one layer
 
-    def compute_delta(self, e, W):
+        Args:
+            X: input from the previous layer
+            save_output: if True save the intermidiate and final output
+        """
+        Z = X @ self.W + self.b
+        A = sigmoid(Z)
+        if save_output:
+            self.Z = Z
+            self.A = A
+        return A
+
+    def backward(self, E, W=None):
+        """Backpropagate the error, and set self.delta
+
+        Args:
+            E: if self.isout -> truth
+               else -> next_layer.delta
+            W: if self.isout -> None
+               else -> next_layer.W
+        Returns:
+            the delta (error) for this layer
+            the weights of the current layer
+        """
+        self.deriv = d_sigmoid(self.Z)
         if self.isout:
-            self.delta = (self.output - e) * self.deriv
+            self.delta = self.A - E
             return self.delta, self.W
-        self.delta = e.dot(W.T) * self.deriv
+
+        #deriv.shape  = (1, nb_classes)
+        #E.shape      = (1, nb_classes)
+        #self.W.shape = (nb_features, nb_classes)
+        #self.delta = np.empty((E.shape[0], self.s_out))
+        self.delta = (E @ W.T) * self.deriv
         return self.delta, self.W
 
-    def update_weights(self, prev):
-        m = self.delta.shape[0]
-        self.W -= self.learning_rate * (np.sum(prev.T.dot(self.delta), axis=0) / m)
-        self.b -= self.learning_rate * (np.sum(self.delta, axis=0) / m)
+    def gradient_descent(self, A):
+        """Apply gradient descent to update the weights
+
+        Args:
+            A: previous layer's output
+        Returns:
+            Current layer's output
+        """
+        m = A.shape[0]
+
+        #calculate gradient
+        nabla_W = (A.T @ self.delta) / m
+        nabla_b = np.sum(self.delta, axis=0, keepdims=True) / m
+
+        #update weights and biases
+        self.W -= self.learning_rate * nabla_W
+        self.b -= self.learning_rate * nabla_b
+
+        return self.A
 
 
 class NeuralNet:
-    def __init__(self, depth, width, s_in, s_out, learning_rate=0.01, load=None):
+    def __init__(self, s_in, s_out, depth, hidden=None, learning_rate=0.01, load=None):
         self.layers = []
         self.depth = depth
         self.learning_rate = learning_rate
-        self.layers.append(NNLayer(s_in, width, learning_rate=learning_rate))
-        for i in range(1, depth - 1):
-            self.layers.append(NNLayer(width, width, learning_rate=learning_rate))
-        self.layers.append(NNLayer(width, s_out, isout=True, learning_rate=learning_rate))
+
+        #initialize the layers
+        if depth >= 2:
+            if hidden is None:
+                hidden = (s_in + s_out) // 2
+            self.layers.append(NNLayer(s_in, hidden, learning_rate=learning_rate))
+            for i in range(1, depth - 1):
+                self.layers.append(NNLayer(hidden, hidden, learning_rate=learning_rate))
+            self.layers.append(NNLayer(hidden, s_out, isout=True, learning_rate=learning_rate))
+        else:
+            self.layers.append(NNLayer(s_in, s_out, isout=True, learning_rate=learning_rate))
 
         if load:
             self.load(load)
@@ -58,30 +106,23 @@ class NeuralNet:
         m = h.shape[0]
         return (- y.T.dot(np.log(h)) - (1 - y).T.dot(np.log(1 - h))).diagonal().sum() / m
 
-    def forward(self, X):
-        a = X
+    def forward(self, X, save_output=False):
         for layer in self.layers:
-            a = layer.forward(a)
-        return a
+            X = layer.forward(X, save_output)
+        return X
 
     def backward(self, X, y):
-        delta, W = self.layers[-1].compute_delta(y, None)
+
+        ## Backpropagate the error
+        delta, W = self.layers[-1].backward(y)
+        # Here delta and W belong to the L+1 layer
         for i in range(self.depth - 2, -1, -1):
-            layer = self.layers[i]
-            delta, W = layer.compute_delta(delta, W)
+            delta, W = self.layers[i].backward(delta, W)
 
-    def gradient_descent(self, X):
-        # Update for every layer except the 1st
-        for i in range(1, self.depth):
-            prev = self.layers[i - 1]
-            layer = self.layers[i]
-            layer.update_weights(prev.output)
-        # Update the 1st layer with X
-        self.layers[0].update_weights(X)
-
-    def update_weights(self, X, y):
-        self.backward(X, y)
-        self.gradient_descent(X)
+        ## Gradient descent
+        A = X
+        for i in range(0, self.depth):
+            A = self.layers[i].gradient_descent(A)
 
     def train(self, ds, lab, epoch=100, batch=None, verbose=False):
         if batch is None:
@@ -92,9 +133,8 @@ class NeuralNet:
             idx = np.random.permutation(ds.shape[0])
             ds, lab = ds[idx], lab[idx]
             for X, y in zip(np.array_split(ds, batch), np.array_split(lab, batch)):
-                self.forward(X)
-                self.update_weights(X, y)
-                #print(self.loss(X, y))
+                self.forward(X, save_output=True)
+                self.backward(X, y)
             loss.append(self.loss(ds, lab))
             if verbose:
                 print("Epoch:", i + 1, "/", epoch, "-- learning_rate:", self.learning_rate, "-- loss:", loss[-1])
@@ -116,6 +156,7 @@ class NeuralNet:
         except Exception as e:
             print("Cannot load weights:", e, file=sys.stderr)
             sys.exit(1)
+
 
 def preprocessing(f):
     #parse and preprocess the data
@@ -147,7 +188,7 @@ if __name__=="__main__":
     X, y = preprocessing(args.training_dataset)
 
     #initialize the network
-    NN = NeuralNet(args.layers, 10, X.shape[1], 1, learning_rate=args.rate, load=args.load)
+    NN = NeuralNet(X.shape[1], 1, depth=2, learning_rate=args.rate, load=args.load)
 
     loss = NN.train(X, y, args.epoch, args.batch, args.verbose)
 

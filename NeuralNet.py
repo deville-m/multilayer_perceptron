@@ -149,8 +149,9 @@ class NeuralNet:
         np.save(fname, [(layer.W, layer.b, layer.activation, layer.learning_rate) for layer in self.layers])
 
     def load(self, fname):
-        if len(fname) >= 4  and fname[-4: -1] != ".npy":
+        if len(fname) >= 4 and fname[-4:] != ".npy":
             fname += ".npy"
+        print(f"Loading {fname}")
         try:
             data = np.load(fname, allow_pickle=True)
         except Exception as e:
@@ -159,6 +160,8 @@ class NeuralNet:
 
         for W, b, activation, rate in data:
             layer = Dense(W.shape[1], W.shape[0], activation=activation, learning_rate=rate)
+            layer.W = W
+            layer.b = b
             self.append(layer)
 
 
@@ -177,8 +180,8 @@ def init_parser():
     parser.add_argument("-r", "--rate", type=float, default=0.01, help="learning rate")
     parser.add_argument("-l", "--layers", type=int, default=2, help="number of layers")
     parser.add_argument("-b", "--batch", type=int, default=None, help="set batch size")
-    parser.add_argument("-v", "--verbose", action="store_true", default=None, help="set batch size")
-    parser.add_argument("-g", "--graph", action="store_true", default=False, help="show learning graphs")
+    parser.add_argument("-v", "--verbose", action="store_true", help="enable verbose mode")
+    parser.add_argument("-g", "--graph", action="store_true", help="show learning graphs")
     parser.add_argument("-s", "--save", help="save the weights to a file")
     parser.add_argument("--load", default=None, help="load weights")
     parser.add_argument("-t", "--test", default=None)
@@ -203,7 +206,7 @@ if __name__=="__main__":
         elif args.layers == 1:
             NN.append(Dense(1, X.shape[1], learning_rate=args.rate))
 
-    loss = NN.train(X, y, args.epoch, args.batch, args.verbose)
+    loss = NN.train(X, y, epoch=args.epoch, batch=args.batch, verbose=args.verbose)
 
     if args.graph:
         #plot the loss

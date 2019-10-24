@@ -202,9 +202,9 @@ if __name__=="__main__":
             NN.append(Dense(10, X.shape[1], learning_rate=args.rate))
             for i in range(1, args.layers - 1):
                 NN.append(Dense(10, 10, learning_rate=args.rate))
-            NN.append(Dense(1, 10, learning_rate=args.rate))
+            NN.append(Dense(1, 10, activation=softmax, learning_rate=args.rate))
         elif args.layers == 1:
-            NN.append(Dense(1, X.shape[1], learning_rate=args.rate))
+            NN.append(Dense(1, X.shape[1], activation=softmax, learning_rate=args.rate))
 
     loss = NN.train(X, y, epoch=args.epoch, batch=args.batch, verbose=args.verbose)
 

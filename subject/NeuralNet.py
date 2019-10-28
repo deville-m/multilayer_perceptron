@@ -164,6 +164,18 @@ class NeuralNet:
             layer.b = b
             self.append(layer)
 
+def PCA(X, n_components):
+    K = X.shape[0]
+
+    cov = X.T @ X / K
+    eigvals, eigvecs = np.linalg.eig(cov)
+
+    order = np.argsort(eigvals)[::-1]
+    components = eigvecs[:, order[:n_components]]
+
+    Z = X @ components
+
+    return Z, components
 
 def preprocessing(f):
     #parse and preprocess the data
@@ -193,6 +205,7 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     X, y = preprocessing(args.training_dataset)
+    X, P = PCA(X, 5)
 
     #initialize the network
     NN = NeuralNet(load=args.load)

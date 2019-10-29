@@ -21,7 +21,10 @@ def sigmoid(x, derivative=False):
     return temp * (1 - temp)
 
 def softmax(x, derivative=False):
-    shiftx = x - np.max(x)
+    if x.shape[1] == 1:
+        return sigmoid(x, derivative)
+    maxi = np.max(x, axis=1).reshape(-1, 1)
+    shiftx = x - maxi
     exps = np.exp(shiftx)
     A = exps / np.sum(exps, axis=1, keepdims=True)
     return A
@@ -164,6 +167,18 @@ class NeuralNet:
             layer.b = b
             self.append(layer)
 
+def PCA(X, n_components):
+    K = X.shape[0]
+
+    cov = X.T @ X / K
+    eigvals, eigvecs = np.linalg.eig(cov)
+
+    order = np.argsort(eigvals)[::-1]
+    components = eigvecs[:, order[:n_components]]
+
+    Z = X @ components
+
+    return Z, components
 
 def preprocessing(f):
     #parse and preprocess the data
@@ -193,18 +208,18 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     X, y = preprocessing(args.training_dataset)
+    X, P = PCA(X, 5)
 
     #initialize the network
     NN = NeuralNet(load=args.load)
 
     if args.load is None:
-        if args.layers >= 2:
-            NN.append(Dense(10, X.shape[1], learning_rate=args.rate))
-            for i in range(1, args.layers - 1):
-                NN.append(Dense(10, 10, learning_rate=args.rate))
-            NN.append(Dense(1, 10, activation=softmax, learning_rate=args.rate))
-        elif args.layers == 1:
-            NN.append(Dense(1, X.shape[1], activation=softmax, learning_rate=args.rate))
+        temp = X.shape[1]
+        while args.layers >= 2:
+            NN.append(Dense(10, temp, learning_rate=args.rate))
+            temp = 10
+            args.layers -= 1
+        NN.append(Dense(1, temp, activation=softmax, learning_rate=args.rate))
 
     loss = NN.train(X, y, epoch=args.epoch, batch=args.batch, verbose=args.verbose)
 

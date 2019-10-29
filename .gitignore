@@ -125,4 +125,6 @@ dmypy.json
 
 weights.npy
 data.csv
+test.csv
+train.csv
 runs

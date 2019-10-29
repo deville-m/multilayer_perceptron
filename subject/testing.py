@@ -3,7 +3,7 @@ import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from NeuralNet import NeuralNet, Dense
+from NeuralNet import NeuralNet, Dense, softmax
 from sklearn.metrics import accuracy_score
 
 def fetch(f):
@@ -12,6 +12,7 @@ def fetch(f):
     labels = df.pop("Diagnostic")
     X, y = df.values.astype(float), labels.values.astype(int)
     y = y.reshape(-1, 1)
+    y = np.array([[0, 1] if x else [1, 0] for x in y])
     return X, y
 
 def init_parser():
@@ -32,7 +33,7 @@ if __name__=="__main__":
     if args.load is None:
         NN.append(Dense(10, X.shape[1]))
         NN.append(Dense(10, 10))
-        NN.append(Dense(1, 10))
+        NN.append(Dense(2, 10, activation=softmax))
 
     y_h = np.around(NN.forward(X))
     print("Accuracy on test:", accuracy_score(y, y_h))

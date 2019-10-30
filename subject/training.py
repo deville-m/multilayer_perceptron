@@ -26,6 +26,7 @@ def init_parser():
     parser.add_argument("-s", "--save", default="weights.npy", help="save the weights to a file")
     parser.add_argument("--load", default=None, help="load weights")
     parser.add_argument("training_dataset")
+    parser.add_argument("validation_dataset")
     return parser
 
 if __name__=="__main__":
@@ -33,6 +34,7 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     X, y = fetch(args.training_dataset)
+    valid = fetch(args.validation_dataset)
 
     np.random.seed(2)
     #initialize the network
@@ -46,18 +48,22 @@ if __name__=="__main__":
             args.layers -= 1
         NN.append(Dense(2, temp, activation=softmax, learning_rate=args.rate))
 
-    loss = NN.train(X, y, epoch=args.epoch, batch=args.batch, verbose=args.verbose)
+    loss, val_loss = NN.train(X, y, epoch=args.epoch, batch=args.batch, verbose=args.verbose, valid=valid)
 
     if args.graph:
         #plot the loss
-        plt.plot(loss)
+        plt.plot(loss, label="training")
+        plt.plot(val_loss, label="cross-validation")
         plt.ylabel("loss(y_h)")
         plt.xlabel("epoch")
         plt.title("MLP using logistic function")
+        plt.legend()
         plt.show()
 
-    #calc accuracy
     y_h = np.around(NN.forward(X))
     print("Accuracy on training:", accuracy_score(y, y_h))
 
+    y_h = np.around(NN.forward(valid[0]))
+    print("Accuracy on validation:", accuracy_score(valid[1], y_h))
+    
     NN.save(args.save)

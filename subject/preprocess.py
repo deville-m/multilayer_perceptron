@@ -37,12 +37,17 @@ if __name__=="__main__":
         print(f"Variance extracted: {np.sum(V[:args.pca]) / np.sum(V) * 100:.1f}%")
     
     size = X.shape[0]
+    
+    np.random.seed(6)
     idx = np.random.permutation(size)
     X, y = X[idx], y[idx]
     
-    split = int(size * .8)
-    X_train, y_train = X[:split], y[:split]
-    X_test, y_test = X[split:], y[split:]
+    train = int(size * .6)
+    valid = int(size * .8)
+    X_train, y_train = X[:train], y[:train]
+    X_valid, y_valid = X[train:valid], y[train:valid]
+    X_test, y_test = X[valid:], y[valid:]
     
     write_csv("train.csv", X_train, y_train)
+    write_csv("validation.csv", X_valid, y_valid)
     write_csv("test.csv", X_test, y_test)

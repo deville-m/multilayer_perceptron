@@ -128,11 +128,12 @@ class NeuralNet:
         for i in range(0, self.depth):
             A = self.layers[i].gradient_descent(A)
 
-    def train(self, ds, lab, epoch=100, batch=None, verbose=False):
+    def train(self, ds, lab, epoch=100, batch=None, verbose=False, valid=None):
         if batch is None:
             batch = len(ds)
         batch = np.ceil(len(ds) / batch)
         loss = []
+        val_loss = []
         for i in range(epoch):
             idx = np.random.permutation(ds.shape[0])
             ds, lab = ds[idx], lab[idx]
@@ -140,9 +141,14 @@ class NeuralNet:
                 self.forward(X, save_output=True)
                 self.backward(X, y)
             loss.append(self.loss(ds, lab))
+            if valid is not None:
+                val_loss.append(self.loss(valid[0], valid[1]))
             if verbose:
-                print("Epoch:", i + 1, "/", epoch, "-- learning_rate:", self.layers[-1].learning_rate, "-- loss:", loss[-1])
-        return np.array(loss).ravel()
+                if valid is None:
+                    print(f"Epoch: {i + 1} / {epoch} -- loss: {loss[-1]:.5f}")
+                else:
+                    print(f"Epoch: {i + 1} / {epoch} -- loss: {loss[-1]:.5f} -- val_loss: {val_loss[-1]:.5f}")
+        return np.array(loss).ravel(), np.array(val_loss).ravel()
 
     def save(self, fname):
         np.save(fname, [(layer.W, layer.b, layer.activation, layer.learning_rate) for layer in self.layers])

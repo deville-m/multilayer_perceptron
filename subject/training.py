@@ -34,6 +34,7 @@ if __name__=="__main__":
 
     X, y = fetch(args.training_dataset)
 
+    np.random.seed(2)
     #initialize the network
     NN = NeuralNet(load=args.load)
 

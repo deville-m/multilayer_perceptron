@@ -124,8 +124,9 @@ dmypy.json
 .pyre/
 
 weights.npy
+normalization.npy
+pca.npy
 data.csv
-test.csv
-train.csv
-validation.csv
+data_test.csv
+data_training.csv
 runs

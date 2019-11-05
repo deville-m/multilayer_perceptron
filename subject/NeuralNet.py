@@ -108,7 +108,8 @@ class NeuralNet:
     def loss(self, X, y):
         h = self.forward(X)
         m = h.shape[0]
-        return (- y.T.dot(np.log(h)) - (1 - y).T.dot(np.log(1 - h))).diagonal().sum() / m
+        L = (- (y.T @ np.log(h)) - ((1 - y).T @ np.log(1 - h))).diagonal()
+        return L.mean() / m
 
     def forward(self, X, save_output=False):
         for layer in self.layers:

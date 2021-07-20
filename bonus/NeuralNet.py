@@ -193,6 +193,7 @@ class NeuralNet:
                         res['epoch'] = e
                         res['rate'] = r
                         res['batch'] = b
+                        res['loss'] = val[-1]
         return res
 
 def PCA(X, n_components):
